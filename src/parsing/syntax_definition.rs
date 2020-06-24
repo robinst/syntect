@@ -45,7 +45,7 @@ pub struct Context {
     pub meta_scope: Vec<Scope>,
     pub meta_content_scope: Vec<Scope>,
     /// This being set false in the syntax file implies this field being set false,
-    /// but it can also be set falso for contexts that don't include the prototype for other reasons
+    /// but it can also be set false for contexts that don't include the prototype for other reasons
     pub meta_include_prototype: bool,
     pub clear_scopes: Option<ClearAmount>,
     /// This is filled in by the linker at link time
@@ -53,6 +53,8 @@ pub struct Context {
     /// and are not included from the prototype.
     pub prototype: Option<ContextId>,
     pub uses_backrefs: bool,
+
+    // another option would be adding a bool here to prioritize matches from embeds
 
     pub patterns: Vec<Pattern>,
 }
@@ -120,6 +122,13 @@ pub enum ContextReference {
 pub enum MatchOperation {
     Push(Vec<ContextReference>),
     Set(Vec<ContextReference>),
+    Embed {
+        context: ContextReference,
+        embed_scope: Option<Scope>,
+        // TODO: Should these be a MatchPattern instead?
+        escape_regex_str: String,
+        escape_captures: Option<CaptureMapping>,
+    },
     Pop,
     None,
 }

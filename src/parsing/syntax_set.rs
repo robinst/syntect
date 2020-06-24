@@ -534,7 +534,9 @@ impl SyntaxSetBuilder {
                     let maybe_context_refs = match match_pat.operation {
                         MatchOperation::Push(ref context_refs) |
                         MatchOperation::Set(ref context_refs) => Some(context_refs),
-                        MatchOperation::Pop | MatchOperation::None => None,
+                        MatchOperation::Pop | MatchOperation::None |
+                        // TODO: is this correct?
+                        MatchOperation::Embed { .. } => None,
                     };
                     if let Some(context_refs) = maybe_context_refs {
                         for context_ref in context_refs.iter() {
@@ -617,15 +619,17 @@ impl SyntaxSetBuilder {
     }
 
     fn link_match_pat(match_pat: &mut MatchPattern, syntax: &SyntaxReference, syntaxes: &[SyntaxReference]) {
-        let maybe_context_refs = match match_pat.operation {
+        match match_pat.operation {
             MatchOperation::Push(ref mut context_refs) |
-            MatchOperation::Set(ref mut context_refs) => Some(context_refs),
-            MatchOperation::Pop | MatchOperation::None => None,
-        };
-        if let Some(context_refs) = maybe_context_refs {
-            for context_ref in context_refs.iter_mut() {
-                Self::link_ref(context_ref, syntax, syntaxes);
+            MatchOperation::Set(ref mut context_refs) => {
+                for context_ref in context_refs.iter_mut() {
+                    Self::link_ref(context_ref, syntax, syntaxes);
+                }
+            },
+            MatchOperation::Embed { ref mut context, .. } => {
+                Self::link_ref(context, syntax, syntaxes);
             }
+            MatchOperation::Pop | MatchOperation::None => {},
         }
         if let Some(ref mut context_ref) = match_pat.with_prototype {
             Self::link_ref(context_ref, syntax, syntaxes);

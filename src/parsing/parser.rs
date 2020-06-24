@@ -200,6 +200,7 @@ impl ParseState {
         while self.parse_next_token(
             line,
             syntax_set,
+            // TODO: can we put these in a struct. It's a lot of mutable arguments.
             &mut match_start,
             &mut search_cache,
             &mut regions,
@@ -615,6 +616,10 @@ impl ParseState {
             MatchOperation::Pop => {
                 self.stack.pop();
                 return true;
+            }
+            MatchOperation::Embed { .. } => {
+                // TODO:
+
             }
             MatchOperation::None => return false,
         };
@@ -1550,6 +1555,46 @@ contexts:
         // it seems that when ST encounters a non existing pop backreference, it just pops back to the with_prototype's original parent context - i.e. cdb is unscoped
         // TODO: it would be useful to have syntest functionality available here for easier testing and clarity
         expect_scope_stacks_with_syntax("a-bcdba-", &["<a>", "<b>"], syntax);
+    }
+
+    #[test]
+    fn can_parse_embed_when_other_context_matches_escape() {
+        let syntax = r#"
+%YAML 1.2
+---
+# See http://www.sublimetext.com/docs/3/syntax.html
+scope: source.embed
+contexts:
+  main:
+    - match: embed
+      scope: keyword.begin
+      embed: contents
+      escape: escape
+      escape_captures:
+        0: keyword.end
+  contents:
+    - match: \w+
+      scope: string
+"#;
+
+        // TODO: embed_scope
+
+        let stack_states = stack_states(parse("embedtestescape", syntax));
+        assert_eq!(
+            stack_states,
+            vec![
+                "<source.embed>",
+                "<source.embed>, <keyword.begin>",
+                "<source.embed>",
+                "<source.embed>, <string>",
+                "<source.embed>",
+                "<source.embed>, <keyword.end>",
+                "<source.embed>",
+            ]
+        );
+
+        //        let syntax = SyntaxDefinition::load_from_str(&syntax_yamlstr, true, None).unwrap();
+        //        expect_scope_stacks_with_syntax("embedtestescape", &["<keyword.begin>", "<string>", "<keyword.end>"], syntax);
     }
 
     fn expect_scope_stacks(line_without_newline: &str, expect: &[&str], syntax: &str) {

@@ -322,33 +322,31 @@ impl SyntaxDefinition {
         } else if let Ok(y) = get_key(map, "set", Some) {
             MatchOperation::Set(SyntaxDefinition::parse_pushargs(y, state, contexts, namer)?)
         } else if let Ok(y) = get_key(map, "embed", Some) {
-            // Same as push so we translate it to what it would be
-            let mut embed_escape_context_yaml = vec!();
-            let mut commands = Hash::new();
-            commands.insert(Yaml::String("meta_include_prototype".to_string()), Yaml::Boolean(false));
-            embed_escape_context_yaml.push(Yaml::Hash(commands));
-            if let Ok(s) = get_key(map, "embed_scope", Some) {
-                commands = Hash::new();
-                commands.insert(Yaml::String("meta_content_scope".to_string()), s.clone());
-                embed_escape_context_yaml.push(Yaml::Hash(commands));
-            }
-            if let Ok(v) = get_key(map, "escape", Some) {
+
+            let context = SyntaxDefinition::parse_reference(y, state, contexts, namer)?;
+
+            let embed_scope = if let Ok(s) = get_key(map, "embed_scope", |y| y.as_str()) {
+                Some(state.scope_repo
+                    .build(s)
+                    .map_err(ParseSyntaxError::InvalidScope)?)
+            } else {
+                None
+            };
+            if let Ok(v) = get_key(map, "escape", |y| y.as_str()) {
+                let escape_regex_str = Self::parse_regex(v, state)?;
                 let mut match_map = Hash::new();
-                match_map.insert(Yaml::String("match".to_string()), v.clone());
-                match_map.insert(Yaml::String("pop".to_string()), Yaml::Boolean(true));
-                if let Ok(y) = get_key(map, "escape_captures", Some) {
-                    match_map.insert(Yaml::String("captures".to_string()), y.clone());
+
+                let escape_captures = if let Ok(y) = get_key(map, "escape_captures", |y| y.as_hash()) {
+                    Some(Self::parse_captures(y, &escape_regex_str, state)?)
+                } else {
+                    None
+                };
+                MatchOperation::Embed {
+                    context,
+                    embed_scope,
+                    escape_regex_str,
+                    escape_captures,
                 }
-                embed_escape_context_yaml.push(Yaml::Hash(match_map));
-                let escape_context = SyntaxDefinition::parse_context(
-                    &embed_escape_context_yaml,
-                    state,
-                    contexts,
-                    false,
-                    namer,
-                )?;
-                MatchOperation::Push(vec![ContextReference::Inline(escape_context),
-                                          SyntaxDefinition::parse_reference(y, state, contexts, namer)?])
             } else {
                 return Err(ParseSyntaxError::MissingMandatoryKey("escape"));
             }
